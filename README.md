@@ -77,4 +77,4 @@ Resurface is licensed under the [GNU General Public License v3.0 or later](resur
 
 ## Links
 
-[XIV Mod Archive](https://www.xivmodarchive.com/user/124593) · [GitHub](https://github.com/link-0402/MagicFit) · [Bluesky](https://bsky.app/profile/xiv-luci.bsky.social) · [Ko-fi](https://ko-fi.com/luci_xiv)
+[XIV Mod Archive](https://www.xivmodarchive.com/user/124593) · [GitHub](https://github.com/link-0402/Resurface) · [Bluesky](https://bsky.app/profile/xiv-luci.bsky.social) · [Ko-fi](https://ko-fi.com/luci_xiv)

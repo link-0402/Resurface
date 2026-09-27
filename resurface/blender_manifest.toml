@@ -6,7 +6,7 @@ name = "Resurface"
 tagline = "Rebuild messy meshes with clean topology, keeping thin details"
 maintainer = "Luci_xiv"
 type = "add-on"
-website = "https://github.com/link-0402/MagicFit"
+website = "https://github.com/link-0402/Resurface"
 
 tags = ["Mesh", "Modeling", "UV"]
 blender_version_min = "4.2.0"

@@ -61,7 +61,7 @@ class _TabPanel(_Sidebar):
 # Luci_xiv's pages: (label, icon, URL).
 LINKS = (
     ("XIV Mod Archive", "PACKAGE", "https://www.xivmodarchive.com/user/124593"),
-    ("GitHub", "SCRIPT", "https://github.com/link-0402/MagicFit"),
+    ("GitHub", "SCRIPT", "https://github.com/link-0402/Resurface"),
     ("Bluesky", "COMMUNITY", "https://bsky.app/profile/xiv-luci.bsky.social"),
     ("Ko-fi", "FUND", "https://ko-fi.com/luci_xiv"),
 )
