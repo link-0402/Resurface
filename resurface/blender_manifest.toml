@@ -1,0 +1,20 @@
+schema_version = "1.0.0"
+
+id = "resurface"
+version = "1.6.1"
+name = "Resurface"
+tagline = "Rebuild messy meshes with clean topology, keeping thin details"
+maintainer = "Luci_xiv"
+type = "add-on"
+website = "https://github.com/link-0402/MagicFit"
+
+tags = ["Mesh", "Modeling", "UV"]
+blender_version_min = "4.2.0"
+license = ["SPDX:GPL-3.0-or-later"]
+
+[build]
+paths_exclude_pattern = [
+  "__pycache__/",
+  "/.*",
+  "*.zip",
+]
