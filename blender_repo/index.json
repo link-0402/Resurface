@@ -1,0 +1,31 @@
+{
+  "version": "v1",
+  "blocklist": [],
+  "data": [
+    {
+      "schema_version": "1.0.0",
+      "id": "resurface",
+      "name": "Resurface",
+      "tagline": "Rebuild messy meshes with clean topology, keeping thin details",
+      "version": "1.6.1",
+      "type": "add-on",
+      "maintainer": "Luci_xiv",
+      "license": [
+        "SPDX:GPL-3.0-or-later"
+      ],
+      "blender_version_min": "4.2.0",
+      "website": "https://github.com/link-0402/Resurface",
+      "permissions": {
+        "files": "Save transferred textures and index maps as PNG files"
+      },
+      "tags": [
+        "Mesh",
+        "Modeling",
+        "UV"
+      ],
+      "archive_url": "./Resurface.zip",
+      "archive_size": 96626,
+      "archive_hash": "sha256:4676ae62577a7f0072e5b86f0bd627f34be3100ee1feea22d9f6c8cff1af3890"
+    }
+  ]
+}

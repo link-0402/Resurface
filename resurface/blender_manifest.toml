@@ -12,6 +12,9 @@ tags = ["Mesh", "Modeling", "UV"]
 blender_version_min = "4.2.0"
 license = ["SPDX:GPL-3.0-or-later"]
 
+[permissions]
+files = "Save transferred textures and index maps as PNG files"
+
 [build]
 paths_exclude_pattern = [
   "__pycache__/",

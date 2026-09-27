@@ -14,11 +14,20 @@ This page is the overview. The [guide](docs/guide.md) covers every tool and sett
 
 ## Installation
 
-1. Download `resurface-<version>.zip` from this repository's Releases (or its `dist` folder).
-2. In Blender, go to **Edit → Preferences → Get Extensions**, open the **⌄** menu at the top right and choose **Install from Disk…**. Pick the zip. You can also drag the zip into the Blender window.
-3. In the 3D Viewport, press **N** and open the **Resurface** tab.
+Add this repository to Blender once, and Blender installs Resurface and its updates from there:
 
-To update, install the new zip the same way.
+1. Open **Edit → Preferences → Get Extensions** in Blender.
+2. Click **Repositories**, click **+**, and choose **Add Remote Repository**.
+3. Add this repository URL:
+
+   `https://raw.githubusercontent.com/link-0402/Resurface/main/blender_repo/index.json`
+4. Tick **Check for Updates on Startup** to get new versions automatically.
+5. Find **Resurface** in the list and install it.
+6. In the 3D Viewport, press **N** and open the **Resurface** tab.
+
+Blender lists one permission for Resurface, *Files*: it saves the textures and index maps it makes as PNG files.
+
+Without the repository, download [`Resurface.zip`](blender_repo/Resurface.zip), open the **⌄** menu at the top right of **Get Extensions** and choose **Install from Disk…**, or drag the zip into the Blender window. Updates are then installed the same way.
 
 Resurface used to be called *Mesh Rebuild* (up to version 1.4.1). Uninstall Mesh Rebuild before installing Resurface, or both tabs show up. Objects rebuilt with Mesh Rebuild can still be restored. Its sidebar settings aren't carried over.
 

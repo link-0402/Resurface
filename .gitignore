@@ -1,3 +1,11 @@
 __pycache__/
 *.pyc
 *.blend1
+
+# Local builds; the distributed package is blender_repo/Resurface.zip
+dist/
+*.zip
+!blender_repo/Resurface.zip
+
+# Generated with the index; GitHub Pages builds its own copy
+blender_repo/index.html

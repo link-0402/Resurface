@@ -1,0 +1,108 @@
+name: Publish Blender Extension Repository
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'resurface/**'
+      - 'blender_repo/**'
+      - 'scripts/**'
+      - '.github/workflows/blender-extension-repository.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: 4.2.0
+            release: Blender4.2
+          - version: 5.2.0
+            release: Blender5.2
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Blender ${{ matrix.version }}
+        run: |
+          curl --fail --location --retry 3 \
+            "https://download.blender.org/release/${{ matrix.release }}/blender-${{ matrix.version }}-linux-x64.tar.xz" \
+            --output /tmp/blender.tar.xz
+          tar -xJf /tmp/blender.tar.xz --directory /tmp
+          echo "/tmp/blender-${{ matrix.version }}-linux-x64" >> "$GITHUB_PATH"
+
+      - name: Build package and repository index
+        shell: pwsh
+        run: |
+          ./scripts/generate-blender-repository.ps1 -RepositoryPath /tmp/site
+
+      - name: Install from the repository like a user would, and run the smoke test
+        env:
+          BLENDER_USER_RESOURCES: /tmp/blender-user
+        run: |
+          blender --background --command extension repo-add --name Resurface --url file:///tmp/site/index.json resurface_repo
+          blender --background --online-mode --command extension install --sync --enable resurface
+          blender --background --python-exit-code 1 --python scripts/smoke_test.py
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify the committed repository
+        shell: pwsh
+        run: |
+          ./scripts/verify-blender-repository.ps1 -RepositoryPath ./blender_repo -ExpectedMinimum 4.2.0
+
+      - name: Set up GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Install Blender
+        env:
+          BLENDER_VERSION: 4.2.0
+        run: |
+          curl --fail --location --retry 3 \
+            "https://download.blender.org/release/Blender4.2/blender-${BLENDER_VERSION}-linux-x64.tar.xz" \
+            --output /tmp/blender.tar.xz
+          tar -xJf /tmp/blender.tar.xz --directory /tmp
+          echo "/tmp/blender-${BLENDER_VERSION}-linux-x64" >> "$GITHUB_PATH"
+          "/tmp/blender-${BLENDER_VERSION}-linux-x64/blender" --version
+
+      - name: Build package and repository index
+        shell: pwsh
+        run: |
+          ./scripts/generate-blender-repository.ps1 -RepositoryPath ./site
+
+      - name: Verify repository metadata
+        shell: pwsh
+        run: |
+          ./scripts/verify-blender-repository.ps1 -RepositoryPath ./site -ExpectedMinimum 4.2.0
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+  deploy:
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

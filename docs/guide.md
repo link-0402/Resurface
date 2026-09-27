@@ -163,13 +163,26 @@ Manual rows are stored per face in an integer attribute named `colorset_row`. It
 
 ## For developers
 
-Build the extension zip from the repository root:
+### Releasing
 
-```
-blender --command extension build --source-dir resurface --output-dir dist
-```
+Users install Resurface from `blender_repo/index.json`, read straight from the `main` branch on GitHub. That index must describe the `blender_repo/Resurface.zip` next to it byte for byte (size and SHA-256), or Blender refuses the download. So always regenerate and commit both together:
 
-The add-on only uses NumPy and Blender's own modules. Layout:
+1. Raise `version` in `resurface/blender_manifest.toml`. Blender only offers an update when the version changes.
+2. Build the package and the index, then check them (PowerShell, from the repository root). The script uses Blender from `PATH`, or the newest one in `C:\Program Files\Blender Foundation`, or `-BlenderPath`:
+
+   ```
+   .\scripts\generate-blender-repository.ps1
+   .\scripts\verify-blender-repository.ps1
+   ```
+3. Commit the source changes together with `blender_repo/Resurface.zip` and `blender_repo/index.json`, and push to `main`.
+
+On every push to `main` that touches the add-on, the *Publish Blender Extension Repository* workflow builds the package on Blender 4.2 and 5.2 and installs it from the index there. It then runs `scripts/smoke_test.py`, which uses every tool on a sphere. It also checks the committed index against the committed zip and the manifest, and publishes the same repository to GitHub Pages (`https://link-0402.github.io/Resurface/index.json`, with an HTML listing at `https://link-0402.github.io/Resurface/`).
+
+To try a build without releasing it, `blender --command extension build --source-dir resurface --output-dir dist` puts `resurface-<version>.zip` into the ignored `dist` folder.
+
+### Code layout
+
+The add-on only uses NumPy and Blender's own modules.
 
 ```
 resurface/
