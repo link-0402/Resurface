@@ -49,6 +49,7 @@ class SourceOptions:
         self.corner_angle = 60.0         # turning angle (deg) that makes a chain corner
         self.min_feature_size = 0.0      # > 0: dissolve seam/crease noise and flip winding
                                          # islands smaller than this (the target edge length)
+        self.flip_islands = True         # flip tiny islands wound against their surroundings
         for k, v in kw.items():
             if not hasattr(self, k):
                 raise AttributeError(k)
@@ -89,8 +90,8 @@ class SourceMesh:
 
         # ---- duplicate faces --------------------------------------------------------------
         sf = np.sort(F, axis=1)
-        nV = len(V)
-        key = (sf[:, 0] * nV + sf[:, 1]) * nV + sf[:, 2]
+        _, key = np.unique(sf, axis=0, return_inverse=True)     # (no nV**3 key: it overflows)
+        key = key.reshape(-1)
         order = np.argsort(key, kind="stable")
         ks = key[order]
         first = np.ones(len(ks), bool)
@@ -164,7 +165,8 @@ class SourceMesh:
         Lmin = float(self.opts.min_feature_size or 0.0)
         self.ekind = self._basic_features()
         self.efeature = self.ekind != 0
-        self._orient_patches(max_island_area=2.0 * Lmin * Lmin)
+        flip = self.opts.flip_islands
+        self._orient_patches(max_island=8 if flip else 0, max_island_area=2.0 * Lmin * Lmin if flip else 0.0)
         if self.opts.sharp_angle is not None:
             self.ekind[self._sharp_features(self.opts.sharp_angle)] |= K_SHARP
             self.efeature = self.ekind != 0
@@ -208,8 +210,16 @@ class SourceMesh:
             a_list.append(order)
             b_list.append(rep)
         lab = connected_components(n, np.concatenate(a_list), np.concatenate(b_list))
-        # verify the merged clusters are tight: split members farther than 4*eps from the rep
+        # verify the merged clusters are tight: members farther than 4*eps from the first vertex
+        # of their cluster (chained through both grids) are split off, and only merged with
+        # vertices in the same cell of one grid, which cannot chain
         lab = relabel(lab)
+        _, first = np.unique(lab, return_index=True)
+        far = norm(V - V[first[lab]]) > 4.0 * eps
+        if far.any():
+            _, cell = np.unique(np.floor(V[far] / eps).astype(np.int64), axis=0, return_inverse=True)
+            lab[far] = lab.max() + 1 + cell.reshape(-1)
+            lab = relabel(lab)
         cnt = np.bincount(lab)
         acc = np.zeros((cnt.size, 3))
         np.add.at(acc, lab, V)
@@ -319,7 +329,7 @@ class SourceMesh:
         comp = relabel(connected_components(nf, f1[good], f2[good]))
         size = np.bincount(comp)
         carea = np.bincount(comp, weights=0.5 * norm(face_normals(self.V, self.F)))
-        small = (size <= max_island) | (carea <= max_island_area)
+        small = (size <= max_island) | (carea < max_island_area)
         # islands: small consistent components that touch a larger one through a bad edge
         c1 = comp[f1[bad]]
         c2 = comp[f2[bad]]

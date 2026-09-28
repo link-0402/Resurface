@@ -136,26 +136,33 @@ def similar_groups(feat, tol, order):
 # ------------------------------------------------------------------------------------------
 # rasterizing
 # ------------------------------------------------------------------------------------------
-def rasterize(UV, W, H, chunk=1 << 20):
-    """Pixels whose centres lie inside each triangle, with UVs wrapping around.
-    UV: (n, 3, 2).  Returns (triangle index, flat pixel index y * W + x)."""
+def rasterize(UV, W, H, chunk=1 << 20, wrap=True):
+    """Pixels whose centres lie inside each triangle, with UVs wrapping around (without
+    `wrap`: clipped to the texture).  UV: (n, 3, 2).  Returns (triangle index, flat pixel
+    index y * W + x)."""
     UV = np.asarray(UV, np.float64)
     n = len(UV)
+    empty = np.zeros(0, np.int64), np.zeros(0, np.int64)
     if n == 0:
-        return np.zeros(0, np.int64), np.zeros(0, np.int64)
+        return empty
     P = UV * np.array([W, H], np.float64)
     lo = P.min(1)
     hi = P.max(1)
     x0 = np.ceil(lo[:, 0] - 0.5).astype(np.int64)
     y0 = np.ceil(lo[:, 1] - 0.5).astype(np.int64)
-    bw = np.floor(hi[:, 0] - 0.5).astype(np.int64) - x0 + 1
-    bh = np.floor(hi[:, 1] - 0.5).astype(np.int64) - y0 + 1
+    x1 = np.floor(hi[:, 0] - 0.5).astype(np.int64)
+    y1 = np.floor(hi[:, 1] - 0.5).astype(np.int64)
+    if not wrap:
+        x0, y0 = np.maximum(x0, 0), np.maximum(y0, 0)
+        x1, y1 = np.minimum(x1, W - 1), np.minimum(y1, H - 1)
+    bw = x1 - x0 + 1
+    bh = y1 - y0 + 1
     A, B, C = P[:, 0], P[:, 1], P[:, 2]
     d = (B[:, 1] - C[:, 1]) * (A[:, 0] - C[:, 0]) + (C[:, 0] - B[:, 0]) * (A[:, 1] - C[:, 1])
     ok = (bw > 0) & (bh > 0) & (np.abs(d) > 1e-12) & (bw <= 4 * W) & (bh <= 4 * H)
     idx = np.nonzero(ok)[0]
     if len(idx) == 0:
-        return np.zeros(0, np.int64), np.zeros(0, np.int64)
+        return empty
     A, B, C, dd = A[idx], B[idx], C[idx], d[idx]
     x0, y0, bw, bh = x0[idx], y0[idx], bw[idx], bh[idx]
     # barycentric weights as affine functions of the pixel centre: l = a * x + b * y + c
@@ -285,6 +292,9 @@ def auto_rows(P, T, UV, W, H, weld=1e-5, group_similar=False, tolerance=0.1, ras
     return rows[grp[isl]], rank[grp[isl]], stats
 
 
+FIT_PREMERGE = 256         # fit_rows clusters at most this many groups exactly
+
+
 def fit_rows(grp, feat, max_rows=31):
     """Merge island groups until at most `max_rows` are left: the most alike groups first
     (triangle count, areas, size and elongation of their largest island), and small groups
@@ -295,7 +305,15 @@ def fit_rows(grp, feat, max_rows=31):
     X = np.log(np.maximum(f[:, :4], 1e-30))
     X[:, 1:3] /= 2.0                     # areas: log of a squared size
     X = np.column_stack([X, f[:, 4]])
-    return ward_merge(X, np.bincount(grp, feat[:, 2], n), 0.0, max_rows)[grp]
+    w = np.bincount(grp, feat[:, 2], n)
+    if n > FIT_PREMERGE:
+        # thousands of groups (shredded UVs): Ward costs n^2 memory and n^3 time, so it runs
+        # on k-means centres of the groups instead
+        C = kmeans(X, FIT_PREMERGE)
+        near = nearest(X, C)[0][:, 0]
+        cl = ward_merge(C, np.bincount(near, w, len(C)), 0.0, max_rows)
+        return relabel(cl[near])[grp]
+    return ward_merge(X, w, 0.0, max_rows)[grp]
 
 
 def paint(rows_per_tri, raster, W, H, padding=0, priority=None):
@@ -500,14 +518,14 @@ def smooth_colors(F, M, dom, r, limit, passes=1):
         return F
     F = F.astype(np.float32)
     lim2 = float(limit) ** 2
-    same = {(dy, dx): M & _shift(M, dy, dx) & (_shift(dom, dy, dx) == dom)
-            for dy in range(-r, r + 1) for dx in range(-r, r + 1)}
+    # the masks are made per offset: caching all (2r + 1)^2 of them takes gigabytes at large r
+    offsets = [(dy, dx) for dy in range(-r, r + 1) for dx in range(-r, r + 1)]
     for _ in range(passes):
         acc = np.zeros_like(F)
         wt = np.zeros(F.shape[:2], np.float32)
-        for (dy, dx), ok0 in same.items():
+        for dy, dx in offsets:
             Fn = _shift(F, dy, dx)
-            ok = ok0 & (((Fn - F) ** 2).sum(-1) < lim2)
+            ok = M & _shift(M, dy, dx) & (_shift(dom, dy, dx) == dom) & (((Fn - F) ** 2).sum(-1) < lim2)
             acc += Fn * ok[..., None]
             wt += ok
         F = np.where(wt[..., None] > 0, acc / np.maximum(wt, 1.0)[..., None], F)

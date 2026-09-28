@@ -852,33 +852,25 @@ class Remesher:
         self.flip_edges("valence")
         return n
 
-    def run(self, iterations=10, polish=3, adaptive_eps=None, progress=None, cancel=None):
+    def run(self, iterations=10, polish=3, adaptive_eps=None):
+        """Yields (fraction done, message) after every pass; stop iterating to cancel."""
         total = iterations + polish
         refine_rounds = set()
         if adaptive_eps:
             refine_rounds = {i for i in range(1, max(iterations - 2, 2), 2)}
         for it in range(iterations):
-            ns = self.split_long()
-            nc = self.collapse_short()
-            nfl = self.flip_edges("valence")
+            self.split_long()
+            self.collapse_short()
+            self.flip_edges("valence")
             self.relax()
             self.project()
-            msg = f"remeshing {it + 1}/{iterations}: split {ns}, collapse {nc}, flip {nfl}"
             if it in refine_rounds:
-                nb, emax = self.refine_sizing(adaptive_eps)
-                msg += f", refine {nb} (max err {emax * 1000:.2f} mm)"
-            if progress:
-                progress((it + 1) / total, msg)
-            if cancel and cancel():
-                return False
+                self.refine_sizing(adaptive_eps)
+            yield (it + 1) / total, f"Remeshing {it + 1}/{iterations}"
         for it in range(polish):
-            nc = self.collapse_short(ratio=0.5)
-            nfl = self.flip_edges("valence")
+            self.collapse_short(ratio=0.5)
+            self.flip_edges("valence")
             self.relax(0.5)
             self.project()
-            if progress:
-                progress((iterations + it + 1) / total, f"polish {it + 1}/{polish}: collapse {nc}, flip {nfl}")
-            if cancel and cancel():
-                return False
+            yield (iterations + it + 1) / total, f"Polishing {it + 1}/{polish}"
         self.finalize()
-        return True

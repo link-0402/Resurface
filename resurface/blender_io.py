@@ -72,7 +72,6 @@ class ObjectData:
 
         # weights: dense (nv, ngroups) keyed by group name
         self.group_names = [g.name for g in obj.vertex_groups]
-        self.group_locks = [g.lock_weight for g in obj.vertex_groups]
         ng = len(self.group_names)
         W = np.zeros((nv, max(ng, 1)), np.float64)
         if ng:
@@ -269,8 +268,18 @@ def _face_blocks(g, src, rm, cmap):
                 "mat": src.fmat[cmap.face[sel, 0]], "tri": src.ftri[cmap.face[sel, 0]], "tag": 0,
             })
     if len(src.twin_face):
-        for tag, o2 in enumerate(np.unique(src.twin_obj).tolist(), start=1):
-            ids = np.nonzero(src.twin_obj == o2)[0]
+        # one block per (object, winding, copy number): a face can have several duplicates in
+        # one object (a front and a back copy, a triplicate), and every one is regenerated
+        nt = len(src.twin_face)
+        same = src.twin_same.astype(np.int64)
+        order = np.lexsort((np.arange(nt), src.twin_face, same, src.twin_obj))
+        k = np.stack([src.twin_obj, same, src.twin_face], 1)[order]
+        new = np.r_[True, (k[1:] != k[:-1]).any(1)]
+        rank = np.empty(nt, np.int64)
+        rank[order] = np.arange(nt) - np.maximum.accumulate(np.where(new, np.arange(nt), 0))
+        groups = np.unique(np.stack([src.twin_obj, same, rank], 1), axis=0).tolist()
+        for tag, (o2, sm, r) in enumerate(groups, start=1):
+            ids = np.nonzero((src.twin_obj == o2) & (same == sm) & (rank == r))[0]
             tmap = np.full(len(src.F), -1, np.int64)
             tmap[src.twin_face[ids]] = ids
             t = tmap[cmap.face]
@@ -634,7 +643,16 @@ def compute_seam_masks(objects, keep_old_seams=True, cut_sharp=False, sharp_angl
     from .core.source import SourceMesh, SourceOptions
     from .core.uvseams import compute_uv_cuts
     g = gather(objects)
-    seams = seam_attributes(g, use_uv=True, use_color=False) if keep_old_seams else []
+    seams = []
+    if keep_old_seams:
+        # only the original layout of the channel being rebuilt: the backup made by the first
+        # run, else the export layer (not uv1, nor the cuts of an earlier run)
+        def original(d):
+            if OLD_UV_NAME in d.uv:
+                return d.uv[OLD_UV_NAME]
+            layer = export_uv_layer(d.obj.data)
+            return d.uv.get(layer.name) if layer is not None else None
+        seams = [corner_layer(g["datas"], g["n_loops"], original, 2)[g["T_loops"]]]
     src = SourceMesh(
         g["V_raw"], g["T_raw"], g["T_obj"], g["T_mat"], seams,
         SourceOptions(merge_distance=merge_distance, fragment_faces=0,

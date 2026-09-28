@@ -4,25 +4,24 @@ param(
     [string]$BlenderPath = ''
 )
 
-# Builds the extension package (Resurface.zip) and the Blender remote repository
-# listing (index.json, index.html) from it.  Blender reads index.json when the
-# repository is added under Preferences > Get Extensions > Repositories.
+# Builds the extension package (named after the add-on, e.g. Resurface.zip) and the
+# Blender remote repository listing (index.json, index.html) from it.  Blender reads
+# index.json when the repository is added under Preferences > Get Extensions >
+# Repositories.
 
 $ErrorActionPreference = 'Stop'
 
-$scriptRoot = if ($PSScriptRoot) {
-    $PSScriptRoot
-} else {
-    Split-Path -Parent $MyInvocation.MyCommand.Definition
-}
+. (Join-Path $PSScriptRoot 'extension-package.ps1')
+
+$repoRoot = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($RepositoryPath)) {
-    $RepositoryPath = [System.IO.Path]::Combine($scriptRoot, '..', 'blender_repo')
+    $RepositoryPath = Join-Path $repoRoot 'blender_repo'
 }
 
-$repoRoot = (Resolve-Path ([System.IO.Path]::Combine($scriptRoot, '..'))).Path
 $addonRoot = Join-Path $repoRoot 'resurface'
+$package = Get-ExtensionPackage (Join-Path $addonRoot 'blender_manifest.toml')
 $resolvedRepository = [System.IO.Path]::GetFullPath($RepositoryPath)
-$packagePath = Join-Path $resolvedRepository 'Resurface.zip'
+$packagePath = Join-Path $resolvedRepository $package.Archive
 
 # Blender: -BlenderPath, else blender on PATH, else the newest one in Program Files.
 $blenderExecutable = $null
@@ -50,9 +49,14 @@ if ($null -eq $blenderExecutable) {
 }
 Write-Host "Using Blender: $blenderExecutable"
 
+# server-generate lists every zip in the folder, so clear out the previous package,
+# including one left over from an earlier add-on name.
 New-Item -ItemType Directory -Path $resolvedRepository -Force | Out-Null
-if (Test-Path -LiteralPath $packagePath) {
-    Remove-Item -LiteralPath $packagePath -Force
+Get-ChildItem -LiteralPath $resolvedRepository -Filter '*.zip' -File | ForEach-Object {
+    if ($_.Name -ne $package.Archive) {
+        Write-Host "Removing old package: $($_.Name)"
+    }
+    Remove-Item -LiteralPath $_.FullName -Force
 }
 
 # The manifest's [build] section decides which files go into the package.
@@ -69,4 +73,4 @@ if ($LASTEXITCODE -ne 0) {
     throw "Blender extension repository generation failed with exit code $LASTEXITCODE."
 }
 
-Write-Host "Generated Blender extension repository at $resolvedRepository"
+Write-Host "Generated Blender extension repository at ${resolvedRepository}: $($package.Archive) ($($package.Name) $($package.Version))"

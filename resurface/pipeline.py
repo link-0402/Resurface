@@ -83,6 +83,7 @@ class RebuildJob:
         self.s = settings
         self.report = {}
         self.cancelled = False
+        self.modified = False            # Blender data was changed (set right before writing)
 
     def target_length(self, src, exclude=None):
         """Base edge length, measured on the part of `src` that will be rebuilt."""
@@ -108,6 +109,7 @@ class RebuildJob:
             sharp_angle=s.sharp_angle if s.preserve_sharp else None,
             corner_angle=s.corner_angle,
             seam_tolerance=s.seam_threshold,
+            flip_islands=s.clean_features,
         )
         src0 = SourceMesh(g["V_raw"], g["T_raw"], g["T_obj"], g["T_mat"], seams, opts)
         self.report["source"] = dict(src0.stats)
@@ -135,28 +137,9 @@ class RebuildJob:
                                    ("noise_patches_merged", "noise_curves_dropped", "faces_reoriented",
                                     "chains", "corners")}
         rm = Remesher(src, L0, min_length=L0 * s.min_edge_ratio)
-        iters = max(int(s.iterations), 1)
-        polish = 3
         eps = s.tolerance * L0 if s.adaptive else None
-        total = iters + polish
-        refine_rounds = {i for i in range(1, max(iters - 2, 2), 2)} if eps else set()
-        for it in range(iters):
-            ns = rm.split_long()
-            nc = rm.collapse_short()
-            nfl = rm.flip_edges("valence")
-            rm.relax()
-            rm.project()
-            msg = f"Remeshing {it + 1}/{iters}"
-            if it in refine_rounds:
-                rm.refine_sizing(eps)
-            yield 0.05 + 0.8 * (it + 1) / total, msg
-        for it in range(polish):
-            rm.collapse_short(ratio=0.5)
-            rm.flip_edges("valence")
-            rm.relax(0.5)
-            rm.project()
-            yield 0.05 + 0.8 * (iters + it + 1) / total, f"Polishing {it + 1}/{polish}"
-        rm.finalize()
+        for frac, msg in rm.run(max(int(s.iterations), 1), adaptive_eps=eps):
+            yield 0.05 + 0.8 * frac, msg
         self.report["remesh"] = rm.stats()
         self.src, self.rm = src, rm      # kept for inspection / debugging
         yield 0.87, "Transferring attributes"
@@ -167,6 +150,7 @@ class RebuildJob:
         written = []
         unchanged = []
         new_objs = []
+        self.modified = True
         for obj, r in zip(self.objects, results):
             if r is None:
                 unchanged.append(obj.name)

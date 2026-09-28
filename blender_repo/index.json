@@ -7,7 +7,7 @@
       "id": "resurface",
       "name": "Resurface",
       "tagline": "Rebuild messy meshes with clean topology, keeping thin details",
-      "version": "1.6.1",
+      "version": "1.0.0",
       "type": "add-on",
       "maintainer": "Luci_xiv",
       "license": [
@@ -24,8 +24,8 @@
         "UV"
       ],
       "archive_url": "./Resurface.zip",
-      "archive_size": 96626,
-      "archive_hash": "sha256:4676ae62577a7f0072e5b86f0bd627f34be3100ee1feea22d9f6c8cff1af3890"
+      "archive_size": 97213,
+      "archive_hash": "sha256:662361d6750d85d03757465eaf4bb6af5e8ffbb88e5ac7cbba1abaa7e2c06839"
     }
   ]
 }

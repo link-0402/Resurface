@@ -4,49 +4,46 @@ param(
     [string]$ExpectedMinimum = '4.2.0'
 )
 
-# Checks that index.json describes the Resurface.zip next to it (size and hash) and
-# the version in resurface/blender_manifest.toml.  Blender refuses to install a
-# package whose size or hash differs from its index entry.
+# Checks that index.json lists only the add-on, under the archive name, id and
+# version from resurface/blender_manifest.toml, and that it describes the zip next
+# to it (size and hash).  Blender refuses to install a package whose size or hash
+# differs from its index entry.
 
 $ErrorActionPreference = 'Stop'
 
-$scriptRoot = if ($PSScriptRoot) {
-    $PSScriptRoot
-} else {
-    Split-Path -Parent $MyInvocation.MyCommand.Definition
-}
+. (Join-Path $PSScriptRoot 'extension-package.ps1')
+
+$repoRoot = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($RepositoryPath)) {
-    $RepositoryPath = [System.IO.Path]::Combine($scriptRoot, '..', 'blender_repo')
+    $RepositoryPath = Join-Path $repoRoot 'blender_repo'
 }
 
+$package = Get-ExtensionPackage (Join-Path (Join-Path $repoRoot 'resurface') 'blender_manifest.toml')
 $resolvedRepository = (Resolve-Path -LiteralPath $RepositoryPath).Path
-$archivePath = Join-Path $resolvedRepository 'Resurface.zip'
+$archivePath = Join-Path $resolvedRepository $package.Archive
 $indexPath = Join-Path $resolvedRepository 'index.json'
-$manifestPath = [System.IO.Path]::Combine($scriptRoot, '..', 'resurface', 'blender_manifest.toml')
 if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
-    throw "Blender extension package not found: $archivePath"
+    throw "Blender extension package not found: $archivePath. Regenerate the repository."
 }
 if (-not (Test-Path -LiteralPath $indexPath -PathType Leaf)) {
     throw "Blender repository index not found: $indexPath"
 }
 
-$entry = (Get-Content -LiteralPath $indexPath -Raw | ConvertFrom-Json).data |
-    Where-Object { $_.id -eq 'resurface' } |
-    Select-Object -First 1
-if ($null -eq $entry) {
-    throw 'Blender repository index does not contain resurface.'
+# A second entry means a zip from an earlier build or add-on name is still there.
+$entries = @((Get-Content -LiteralPath $indexPath -Raw | ConvertFrom-Json).data)
+if ($entries.Count -ne 1 -or $entries[0].id -ne $package.Id) {
+    $listed = ($entries | ForEach-Object { "$($_.id) ($($_.archive_url))" }) -join ', '
+    throw "Blender repository index should list only $($package.Id), found: $listed. Regenerate the repository."
+}
+$entry = $entries[0]
+if ($entry.archive_url -ne "./$($package.Archive)") {
+    throw "Archive name mismatch: expected ./$($package.Archive), index=$($entry.archive_url). Regenerate the repository."
 }
 if ($entry.blender_version_min -ne $ExpectedMinimum) {
     throw "Blender minimum mismatch: expected $ExpectedMinimum, found $($entry.blender_version_min)."
 }
-
-$manifest = Get-Content -LiteralPath $manifestPath -Raw
-$versionMatch = [regex]::Match($manifest, '(?m)^version\s*=\s*"([^"]+)"')
-if (-not $versionMatch.Success) {
-    throw "No version found in $manifestPath"
-}
-if ($entry.version -ne $versionMatch.Groups[1].Value) {
-    throw "Version mismatch: manifest=$($versionMatch.Groups[1].Value), index=$($entry.version). Regenerate the repository."
+if ($entry.version -ne $package.Version) {
+    throw "Version mismatch: manifest=$($package.Version), index=$($entry.version). Regenerate the repository."
 }
 
 $archive = Get-Item -LiteralPath $archivePath
@@ -59,4 +56,4 @@ if (([string]$entry.archive_hash).ToLowerInvariant() -ne "sha256:$actualHash") {
     throw "Blender archive hash mismatch: index=$($entry.archive_hash), actual=sha256:$actualHash."
 }
 
-Write-Host "Verified Blender repository: Resurface $($entry.version), $($archive.Length) bytes, sha256:$actualHash"
+Write-Host "Verified Blender repository: $($package.Archive), $($package.Name) $($entry.version), $($archive.Length) bytes, sha256:$actualHash"

@@ -1,20 +1,19 @@
 # Resurface
 
-A Blender add-on by **Luci_xiv** that rebuilds messy meshes into clean, even triangles without losing thin parts like strings, straps and fringe. Decimated triangle soup, slivers, uneven density and non-manifold junctions all come out as a tidy surface. UVs, weights, shape keys and normals come along, and the result exports back to `.mdl`. The same sidebar tab has tools for normals, UV layouts, textures and FFXIV index maps.
+A Blender add-on that rebuilds messy meshes into clean, even triangles without losing thin parts like strings, straps and fringe. Decimated triangle soup, slivers, uneven density and non-manifold junctions all come out as a tidy surface. UVs, weights, shape keys and normals all get preserved. The addon also supports generating repaired, smoothed normals, building new UV layouts, easily rebaking textures to that new layout and generating FFXIV index maps.
 
-![Rebuild Mesh on the Lotus Dress: one click, about 12 seconds, and every string is still there](docs/images/rebuild.gif)
+![Rebuild Mesh: one click, about 12 seconds, and fine detail, like these thin side strings, gets fully preserved](docs/images/rebuild.gif)
 
-This page is the overview. The [guide](docs/guide.md) covers every tool and setting in detail.
+This page only gives a brief overview. The [guide](docs/guide.md) covers every tool and setting in detail.
 
 ## Requirements
 
-- **Blender 4.2 or newer.** It's tested with Blender 5.2 LTS.
-- **Nothing else to install.** It only needs NumPy, which comes with Blender.
-- **For FFXIV models,** an importer and exporter such as XIV Instant Edit, to get `.mdl` files in and out of Blender. The texture tools work on images Blender can open, so export `.tex` files as PNG from Penumbra or TexTools first.
+- **Blender 4.2 or newer.** Note: I've personally only tested with Blender 5.2 LTS.
+- **For FFXIV models,** an importer and exporter such as [XIV Instant Edit](https://github.com/link-0402/XIV-Instant-Edit) or TexTools to get `.mdl` files in and out of Blender. The texture transfer works on common image formats Blender can open, so export `.tex` files to a format like TGA or PNG first.
 
 ## Installation
 
-Add this repository to Blender once, and Blender installs Resurface and its updates from there:
+Add this repository to Blender to automatically install it along with automatic updates:
 
 1. Open **Edit → Preferences → Get Extensions** in Blender.
 2. Click **Repositories**, click **+**, and choose **Add Remote Repository**.
@@ -25,15 +24,9 @@ Add this repository to Blender once, and Blender installs Resurface and its upda
 5. Find **Resurface** in the list and install it.
 6. In the 3D Viewport, press **N** and open the **Resurface** tab.
 
-Blender lists one permission for Resurface, *Files*: it saves the textures and index maps it makes as PNG files.
-
-Without the repository, download [`Resurface.zip`](blender_repo/Resurface.zip), open the **⌄** menu at the top right of **Get Extensions** and choose **Install from Disk…**, or drag the zip into the Blender window. Updates are then installed the same way.
-
-Resurface used to be called *Mesh Rebuild* (up to version 1.4.1). Uninstall Mesh Rebuild before installing Resurface, or both tabs show up. Objects rebuilt with Mesh Rebuild can still be restored. Its sidebar settings aren't carried over.
-
 ## Features
 
-The tab has three pages: **Mesh**, **Normals** and **UVs**. Each tool shows its last result in a box in its own panel.
+The tab has three pages: **Mesh**, **Normals** and **UVs**.
 
 ![The Resurface tab: the Mesh page after Analyze, the Normals page, and the UVs page with all four tools](docs/images/sidebar.png)
 
@@ -44,10 +37,10 @@ The tab has three pages: **Mesh**, **Normals** and **UVs**. Each tool shows its 
 - UVs, vertex weights, shape keys, colors and normals are carried over. Each object keeps its name, modifiers, vertex groups and materials.
 - It runs in the background, with progress in the status bar. **Esc** cancels.
 - The original mesh is kept, and **Restore Original** swaps it back.
-- **Analyze** reports what's wrong with a mesh. **Remove Hidden Layers** deletes under-layers that can never be seen, such as the second copy of the cloth under most of the Lotus Dress.
+- **Analyze** reports what's wrong with a mesh. **Remove Hidden Layers** deletes under-layers that can never be seen but might clip through the front mesh on meshes with bad geometry.
 - Under **Afterwards**, Rebuild Mesh also runs **Smooth Normals** (on by default) and **Rebuild UVs** on the new mesh.
 
-![The Lotus Dress before and after Rebuild Mesh: the side strings (top) and the chest (bottom)](docs/images/before-after.jpg)
+![The dress before and after Rebuild Mesh: the side strings (top) and the chest (bottom)](docs/images/before-after.jpg)
 
 ### Smooth Normals
 
@@ -64,21 +57,16 @@ The UVs page has four tools:
 
 ## Good to know
 
-- **Rebuild parts that touch together.** Select all of them (both halves of a dress, say), so their shared edges stay aligned.
+- **Rebuild parts that touch together.** Select all of them, so their shared edges stay aligned.
 - **For hair and hand-edited normals,** switch off *Afterwards: Smooth Normals*. The original normals are then carried over instead.
 - **Keep Remove Hidden Layers off for see-through textures** such as lace or mesh fabric, because the layer below shows through the holes.
-- **The original mesh stays in the .blend** (as *<mesh> (original)*) until you click **Discard Original** under *Output*. It isn't exported.
-- **Ready for export:** the result is all triangles, which the MDL exporter needs. XIV Instant Edit ignores the **Old UVs** layer and the index map rows (`colorset_row`). Delete Old UVs once you no longer need it.
-- **The UVs page replaces two older scripts,** *UV Scale to Dimensions* and *XIV Index Map Generator*. Disable them once you've switched. Rows made with the old generator can be converted with **Convert Old Row Groups**.
-- **The globe icon** at the right end of the tab bar links to Luci_xiv's mods on XIV Mod Archive, the GitHub page, Bluesky and Ko-fi.
+- **The original mesh stays in the .blend** (as *<mesh> (original)*) until you click **Discard Original** under *Output*.
+- **Ready for export:** the result is all triangles, which the MDL exporter needs. XIV Instant Edit ignores the **Old UVs** layer and the index map rows (`colorset_row`).
 
 ## Credits
 
 - **Remeshing** follows *A Remeshing Approach to Multiresolution Modeling* by Mario Botsch and Leif Kobbelt (2004) and *Adaptive Remeshing for Real-Time Mesh Deformation* by Marion Dunyach et al. (2013), extended for non-manifold, layered game meshes.
 - **Rebuild UVs** uses Blender's own *Minimum Stretch* unwrapper and island packing.
-- **Screenshots:** Luci's Lotus Dress, a model swap of FINAL FANTASY XIV gear.
-
-FINAL FANTASY XIV © SQUARE ENIX CO., LTD. Resurface is a fan-made tool, not affiliated with or endorsed by Square Enix.
 
 ## License
 

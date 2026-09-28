@@ -100,14 +100,21 @@ class RESURFACE_OT_rebuild(Operator):
     def _finish(self, context, rep):
         show_report(self, context, "report_mesh", format_report(rep))
 
+    def _fail(self, e):
+        traceback.print_exc()
+        if self._job.modified:
+            # the meshes were already replaced: finish, so the change gets an undo step
+            self.report({"ERROR"}, f"Rebuild finished with an error: {e}")
+            return {"FINISHED"}
+        self.report({"ERROR"}, f"Rebuild failed: {e}")
+        return {"CANCELLED"}
+
     def execute(self, context):
-        job = self._make_job(context)
+        self._job = self._make_job(context)
         try:
-            rep = job.run()
+            rep = self._job.run()
         except Exception as e:  # noqa: BLE001 - report any failure to the user
-            traceback.print_exc()
-            self.report({"ERROR"}, f"Rebuild failed: {e}")
-            return {"CANCELLED"}
+            return self._fail(e)
         self._finish(context, rep)
         return {"FINISHED"}
 
@@ -145,10 +152,8 @@ class RESURFACE_OT_rebuild(Operator):
             self._finish(context, self._job.report)
             return {"FINISHED"}
         except Exception as e:  # noqa: BLE001
-            traceback.print_exc()
             self._cleanup(context)
-            self.report({"ERROR"}, f"Rebuild failed: {e}")
-            return {"CANCELLED"}
+            return self._fail(e)
         if msg.startswith("Writing"):
             self._writing = True
         context.window_manager.progress_update(frac * 100)

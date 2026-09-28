@@ -132,23 +132,3 @@ class CornerMap:
         self.verts = T_raw[tri[..., None], rc]          # (nf, 3, 3) global raw vertex ids
         self.w = cs_bary                                # (nf, 3, 3)
         self.face = cs_face
-
-    def corner(self, values, sel=None):
-        """Interpolate a per-loop array (n_loops, d) -> (n_sel_faces, 3, d)."""
-        L = self.loops if sel is None else self.loops[sel]
-        W = self.w if sel is None else self.w[sel]
-        return np.einsum("fcj,fcjd->fcd", W, values[L])
-
-    def point(self, values, sel=None):
-        """Interpolate a per-raw-vertex array (n_verts, d) -> (n_sel_faces, 3, d)."""
-        Vv = self.verts if sel is None else self.verts[sel]
-        W = self.w if sel is None else self.w[sel]
-        return np.einsum("fcj,fcjd->fcd", W, values[Vv])
-
-    def nearest_point(self, values, sel=None):
-        """Value of the dominant source vertex (for ints / bools)."""
-        Vv = self.verts if sel is None else self.verts[sel]
-        W = self.w if sel is None else self.w[sel]
-        j = np.argmax(W, axis=-1)
-        idx = np.take_along_axis(Vv, j[..., None], axis=-1)[..., 0]
-        return values[idx]

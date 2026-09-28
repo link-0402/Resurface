@@ -168,7 +168,7 @@ Manual rows are stored per face in an integer attribute named `colorset_row`. It
 Users install Resurface from `blender_repo/index.json`, read straight from the `main` branch on GitHub. That index must describe the `blender_repo/Resurface.zip` next to it byte for byte (size and SHA-256), or Blender refuses the download. So always regenerate and commit both together:
 
 1. Raise `version` in `resurface/blender_manifest.toml`. Blender only offers an update when the version changes.
-2. Build the package and the index, then check them (PowerShell, from the repository root). The script uses Blender from `PATH`, or the newest one in `C:\Program Files\Blender Foundation`, or `-BlenderPath`:
+2. Build the package and the index, then check them (PowerShell, from the repository root). The script uses Blender from `PATH`, or the newest one in `C:\Program Files\Blender Foundation`, or `-BlenderPath`. The zip is named after `name` in the manifest (spaces become hyphens), and a zip left over from an older name is removed:
 
    ```
    .\scripts\generate-blender-repository.ps1
