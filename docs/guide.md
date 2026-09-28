@@ -21,7 +21,7 @@ Press **N** in the 3D Viewport and open the **Resurface** tab. Its three pages:
 | **Normals** | Smooth Normals |
 | **UVs** | Rebuild UVs, Transfer Texture, Resize Canvas, Index Map Generator |
 
-Each tool shows its last result in a box in its own panel; the **×** hides it. The gear buttons jump to the page whose settings a switch uses. The globe icon at the right end of the tab bar opens the links (XIV Mod Archive, GitHub, Bluesky, Ko-fi).
+Each tool shows its last result in a box in its own panel; the **×** hides it. The gear buttons jump to the page whose settings a switch uses.
 
 ## Rebuild Mesh
 
