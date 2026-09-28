@@ -58,7 +58,7 @@ Each object keeps its name, modifiers, custom properties, vertex groups and mate
 
 Borders and non-manifold junctions are always kept.
 
-On the Lotus Dress, the defaults give about the input's triangle count (60k in, 61k out) in about 12 seconds, with a median triangle quality of 0.97 (1.0 is equilateral). 99% of the original surface lies within about 0.4 mm of the result.
+On the test dress, the defaults give about the input's triangle count (60k in, 61k out) in about 12 seconds, with a median triangle quality of 0.97 (1.0 is equilateral). 99% of the original surface lies within about 0.4 mm of the result.
 
 ### How it works
 
@@ -70,7 +70,7 @@ On the Lotus Dress, the defaults give about the input's triangle count (60k in, 
 
 ### Hidden layers
 
-Some models carry a second copy of a surface a few millimetres under the visible one, facing the same way, usually from simulated cloth thickness or duplicated panels. On the Lotus Dress, 46% of the surface is such an under-layer (the front panel, both back halves and the straps). It can never be seen: from outside the shell covers it, and from inside it's a back face. It still costs triangles, and in Edit Mode its edges show through the shell.
+Some models carry a second copy of a surface a few millimetres under the visible one, facing the same way, usually from simulated cloth thickness or duplicated panels. On the test dress, 46% of the surface is such an under-layer (the front panel, both back halves and the straps). It can never be seen: from outside the shell covers it, and from inside it's a back face. It still costs triangles, and in Edit Mode its edges show through the shell.
 
 **Analyze** reports these layers, and **Rebuild** prints a tip when it finds them. With **Remove Hidden Layers** on, they're deleted before rebuilding. The decision is made per patch, so a string or strap crossing a panel never punches a hole. Where the under-layer stuck out past the shell's edge (by about a millimetre on the dress's scalloped rims), that sliver goes too.
 
@@ -107,7 +107,7 @@ Smart UV Project cuts by face angle, so on ruched cloth every wrinkle becomes a 
 3. **Unwrap** with Blender's *Minimum Stretch* unwrapper, then cut narrow bridges the first unwrap reveals, and split thin strips far longer than the panels so they pack well.
 4. **Pack** with equal texel density and **Margin** between islands. With **Keep Orientation**, each island is turned the way it was in the old UVs and packed without rotating, which keeps textures and normal maps easy to transfer.
 
-On the Lotus Dress, 55 overlapping islands using 20% of the texture (12.9% of it claimed twice) become 97 islands using 50%, with no overlap.
+On the test dress, 55 overlapping islands using 20% of the texture (12.9% of it claimed twice) become 97 islands using 50%, with no overlap.
 
 ## Transfer Texture
 
