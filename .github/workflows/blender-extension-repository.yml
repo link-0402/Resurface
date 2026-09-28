@@ -27,7 +27,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - version: 4.2.0
+          # Latest 4.2 LTS: in 4.2.0, "extension install" fails on the local-only
+          # user_default and system repositories ("has no data, sync may be needed").
+          - version: 4.2.23
             release: Blender4.2
           - version: 5.2.0
             release: Blender5.2
