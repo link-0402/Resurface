@@ -70,7 +70,7 @@ The UVs page has four tools:
 
 ## License
 
-Resurface is licensed under the [GNU General Public License v3.0 or later](resurface/LICENSE). To build it from source or find your way around the code, see [For developers](docs/guide.md#for-developers) in the guide.
+Resurface is licensed under the [GNU General Public License v3.0 or later](resurface/LICENSE).
 
 ## Links
 
