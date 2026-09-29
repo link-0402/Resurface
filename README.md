@@ -19,7 +19,7 @@ Add this repository to Blender to automatically install it along with automatic 
 2. Click **Repositories**, click **+**, and choose **Add Remote Repository**.
 3. Add this repository URL:
    ```
-   `https://raw.githubusercontent.com/link-0402/Resurface/main/blender_repo/index.json`
+   https://raw.githubusercontent.com/link-0402/Resurface/main/blender_repo/index.json
    ```
 4. Tick **Check for Updates on Startup** to get new versions automatically.
 5. Find **Resurface** in the list and install it.
