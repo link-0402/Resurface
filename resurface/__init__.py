@@ -4,8 +4,8 @@ Works on the raw surface instead of a voxel grid, so borders, non-manifold junct
 UV seams and thin strips (strings, straps, fringe) survive.  UVs, colors, custom
 normals, vertex weights and shape keys are transferred onto the new topology.
 
-The sidebar tab has three pages: Mesh (the rebuild), Normals (Smooth Normals) and
-UVs (Rebuild UVs, Transfer Texture, Resize Canvas, Index Map Generator).
+The sidebar tab has three pages: Mesh (the rebuild), Normals (Smooth Normals, Normal
+Map Seams) and UVs (Rebuild UVs, Transfer Texture, Resize Canvas, Index Map Generator).
 """
 
 if "bpy" in locals():

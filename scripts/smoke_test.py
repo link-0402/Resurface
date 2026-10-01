@@ -44,6 +44,25 @@ check(all(len(p.vertices) == 3 for p in mesh.polygons), "rebuilt mesh is all tri
 check(len(mesh.uv_layers) > 0, "UVs transferred")
 
 run(bpy.ops.resurface.smooth_normals, "Smooth Normals")
+
+# a flat normal map: the check can't tell, so Fix only flips it when asked to
+material = bpy.data.materials.new("Normal Map Test")
+material.use_nodes = True
+tree = material.node_tree
+flat = bpy.data.images.new("Flat Normal", 64, 64)
+flat.generated_color = (0.5, 0.5, 1.0, 1.0)
+image_node = tree.nodes.new("ShaderNodeTexImage")
+image_node.image = flat
+normal_node = tree.nodes.new("ShaderNodeNormalMap")
+tree.links.new(image_node.outputs["Color"], normal_node.inputs["Color"])
+tree.links.new(normal_node.outputs["Normal"], tree.nodes["Principled BSDF"].inputs["Normal"])
+sphere.data.materials.append(material)
+run(bpy.ops.resurface.check_normal_maps, "Check Normal Maps")
+check("Flat Normal" in settings.report_normalmap, "normal map check report")
+run(bpy.ops.resurface.fix_normal_maps, "Fix Normal Maps")
+check(image_node.image == flat, "a map the check can't judge is left alone")
+run(bpy.ops.resurface.fix_normal_maps, "Fix Normal Maps (also unclear ones)", include_unclear=True)
+check(image_node.image.name == "Flat Normal_green_up", "flipped copy put in place")
 run(bpy.ops.resurface.rebuild_uvs, "Rebuild UVs")
 check(mesh.uv_layers.get("Old UVs") is not None, "Old UVs layer kept")
 

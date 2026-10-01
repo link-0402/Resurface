@@ -5,6 +5,7 @@ Every tool and setting in detail. For an overview, installation and credits, see
 - [The sidebar](#the-sidebar)
 - [Rebuild Mesh](#rebuild-mesh)
 - [Smooth Normals](#smooth-normals)
+- [Normal Map Seams](#normal-map-seams)
 - [Rebuild UVs](#rebuild-uvs)
 - [Transfer Texture](#transfer-texture)
 - [Resize Canvas](#resize-canvas)
@@ -18,7 +19,7 @@ Press **N** in the 3D Viewport and open the **Resurface** tab. Its three pages:
 | Page | Tools |
 |---|---|
 | **Mesh** | Rebuild Mesh, Analyze, Restore Original / Discard Original |
-| **Normals** | Smooth Normals |
+| **Normals** | Smooth Normals, Normal Map Seams |
 | **UVs** | Rebuild UVs, Transfer Texture, Resize Canvas, Index Map Generator |
 
 Each tool shows its last result in a box in its own panel; the **×** hides it. The gear buttons jump to the page whose settings a switch uses.
@@ -95,6 +96,25 @@ On the **Normals** page. It works on any selected meshes, rebuilt or not, and pr
 - optionally blurs the result (**Blur** passes) to soften lumpy, decimated surfaces. Hard edges are never blurred across.
 
 It never changes face winding, so what is visible from outside and from inside stays exactly the same. **Fix Flipped Faces** (off by default) also flips tiny stray groups of faces wound against their surroundings. Larger inward-facing regions, like seam allowances or the insides of straps, are usually meant to be seen from inside and are left alone.
+
+## Normal Map Seams
+
+On the **Normals** page, under Smooth Normals. It finds normal maps whose green channel points the wrong way. That shows as hard lines along UV seams in Material Preview and in game, most visibly on glossy materials. Recalculating or smoothing the normals doesn't help, because the mesh normals are fine.
+
+Normal maps come in two styles. Blender and FFXIV expect green to point up (OpenGL style), while most other engines, Unreal among them, have it pointing down (DirectX style). Textures ported from those games keep their style, so the bumps are lit the wrong way along the texture's height. Inside one UV island that only looks slightly off. Where two islands meet whose UVs are turned differently, though, the two sides disagree, and reflections break along the seam.
+
+- **Check** reads the normal maps in the selected meshes' materials, meaning Image Texture nodes that feed a *Normal Map* node in Tangent Space, as in XIV Instant Edit's material previews. Along every UV seam it compares the two sides, once with the map as it is and once with green flipped. For each map it reports:
+  - *green points up, fine*;
+  - *green points down (DirectX style)*, and how much better the seams fit with green flipped;
+  - *no UV seams to compare*, *too few UV seams to tell* or *can't tell*: the map's islands don't touch each other, or the map is flat.
+- **Fix** runs the check and replaces every map whose green points down with a flipped copy named `<name>_green_up`. The copy is saved as PNG next to the original file when there is one, otherwise it is packed into the .blend. The original image stays in the file, and **Ctrl+Z** undoes the fix. **Also Unclear Ones** (press **F9** after Fix) flips the maps the check can't judge as well, for example the remaining textures of a port whose other maps point down.
+
+The fix only changes the texture in Blender. For the game, flip green in the mod's normal texture too:
+
+- **In Penumbra**, open the texture in the Advanced Editing window's Textures tab. Set the color matrix so that green becomes 1 − green (−1 for green to green, and 1 as green's constant), then save the texture as BC7.
+- **Or** export it as PNG, run Fix on it in Blender (or flip green in an image editor), and import `<name>_green_up.png` back as `.tex`.
+
+After a fix, leave Transfer Texture's **Green Points Down** off for these maps.
 
 ## Rebuild UVs
 
@@ -175,6 +195,7 @@ resurface/
   core/remesh.py                               the remesher
   core/transfer.py                             locating corners on the source surface
   core/normals.py                              smooth normals and flipped-face detection
+  core/normalmaps.py                           the green-channel check for normal maps
   core/uvseams.py                              seam placement for Rebuild UVs
   core/texremap.py                             moving textures between UV layouts
   core/canvas.py                               UV mapping for a cropped or extended canvas

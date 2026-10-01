@@ -13,7 +13,7 @@ blender_version_min = "4.2.0"
 license = ["SPDX:GPL-3.0-or-later"]
 
 [permissions]
-files = "Save transferred textures and index maps as PNG files"
+files = "Save transferred textures, normal map fixes and index maps"
 
 [build]
 paths_exclude_pattern = [

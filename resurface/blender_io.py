@@ -888,19 +888,22 @@ def _uv_triangles(objects, layer_name):
     return np.concatenate(tris) if tris else np.zeros((0, 3, 2))
 
 
-def transfer_texture(objects, image, mode="COLOR", flip_green=False, padding=8, save=True):
-    """Resample `image` from the old UV layout ("Old UVs") to the current one.
-    Returns (new image, file path or None)."""
-    import os
-    import bpy
-    from .core.texremap import remap
+def _image_pixels(image):
+    """(h, w, channels) float32 pixels, row 0 at the bottom."""
     w, h = image.size
     if w == 0 or h == 0:
         raise ValueError(f"image '{image.name}' has no pixel data (is the file missing?)")
-    C = image.channels
-    buf = np.empty(w * h * C, np.float32)
+    buf = np.empty(w * h * image.channels, np.float32)
     image.pixels.foreach_get(buf)
-    img = buf.reshape(h, w, C)
+    return buf.reshape(h, w, image.channels)
+
+
+def transfer_texture(objects, image, mode="COLOR", flip_green=False, padding=8, save=True):
+    """Resample `image` from the old UV layout ("Old UVs") to the current one.
+    Returns (new image, file path or None)."""
+    from .core.texremap import remap
+    img = _image_pixels(image)
+    h, w, C = img.shape
     new_uv = _uv_triangles(objects, None)
     old_uv = _uv_triangles(objects, OLD_UV_NAME)
     out, filled = remap(img, new_uv, old_uv, w, h, mode=mode, flip_green=flip_green, padding=padding)
@@ -911,23 +914,159 @@ def transfer_texture(objects, image, mode="COLOR", flip_green=False, padding=8, 
             out[empty] = np.array([0.5, 0.5, 1.0, 1.0], np.float32)[:C]
         else:
             out[empty, 3] = 1.0
-    base = os.path.splitext(image.name)[0]
-    new = bpy.data.images.new(base + "_newuv", w, h, alpha=(C == 4), float_buffer=image.is_float)
+    return _store_copy(image, out, "_newuv", save)
+
+
+def _store_copy(image, pixels, suffix, save=True):
+    """A new image like `image` holding `pixels` ((h, w, channels) float), named <name><suffix>.
+    Saved as <name><suffix>.png next to the original file when there is one, otherwise
+    packed into the .blend.  Returns (new image, file path or None)."""
+    import os
+    root, ext = os.path.splitext(image.name)
+    # only strip a real file extension ("Normal.png"), not the ".mtrl [hash] Normal" of material textures
+    base = root if 1 < len(ext) <= 5 and ext[1:].isalnum() else image.name
+    h, w, C = pixels.shape
+    new = bpy.data.images.new(base + suffix, w, h, alpha=(C == 4), float_buffer=image.is_float)
     try:
         new.colorspace_settings.name = image.colorspace_settings.name
     except (TypeError, AttributeError):
         pass
     new.alpha_mode = image.alpha_mode
-    new.pixels.foreach_set(out.ravel())
+    new.pixels.foreach_set(pixels.ravel())
     path = None
     src_path = bpy.path.abspath(image.filepath) if image.filepath else ""
     if save and src_path and os.path.isdir(os.path.dirname(src_path)):
-        path = os.path.join(os.path.dirname(src_path), base + "_newuv.png")
+        path = os.path.join(os.path.dirname(src_path), base + suffix + ".png")
         new.filepath_raw = path
         new.file_format = "PNG"
         new.save()
     else:
         new.pack()
+    return new, path
+
+
+# ==========================================================================================
+# normal maps
+# ==========================================================================================
+def _feeding_images(socket, depth=6):
+    """Image Texture nodes whose output reaches `socket` (also through reroutes and
+    channel or math nodes)."""
+    found, seen, todo = [], set(), [(socket, 0)]
+    while todo:
+        sock, d = todo.pop()
+        for link in sock.links:
+            src = link.from_node
+            if src.name in seen:
+                continue
+            seen.add(src.name)
+            if src.bl_idname == "ShaderNodeTexImage":
+                if src.image is not None:
+                    found.append(src)
+            elif d < depth:
+                todo.extend((s, d + 1) for s in src.inputs)
+    return found
+
+
+def normal_map_uses(objects):
+    """Tangent-space normal maps in the objects' materials, as
+    {image: [(object, material slot index, UV map name, image node), ...]}."""
+    uses = {}
+    for o in objects:
+        me = o.data
+        render_uv = next((l.name for l in me.uv_layers if l.active_render), None)
+        for idx, slot in enumerate(o.material_slots):
+            m = slot.material
+            if m is None or m.node_tree is None:
+                continue
+            for nm in m.node_tree.nodes:
+                if nm.bl_idname != "ShaderNodeNormalMap" or nm.space != "TANGENT":
+                    continue
+                # an empty UV map on the node means the mesh's render UV map
+                uv_name = nm.uv_map if nm.uv_map in me.uv_layers else render_uv
+                if uv_name is None:
+                    continue
+                for tex in _feeding_images(nm.inputs["Color"]):
+                    uses.setdefault(tex.image, []).append((o, idx, uv_name, tex))
+    return uses
+
+
+def _tangent_triangles(o, uv_name, mat_index):
+    """Corner UVs, positions, normals and tangents (world space) and bitangent signs of
+    the object's triangles in material slot `mat_index`, with Blender's tangents."""
+    from .core.normalmaps import triangle_tangents
+    me = o.data
+    me.calc_loop_triangles()
+    nt = len(me.loop_triangles)
+    tl = np.empty(nt * 3, np.int64)
+    tp = np.empty(nt, np.int64)
+    me.loop_triangles.foreach_get("loops", tl)
+    me.loop_triangles.foreach_get("polygon_index", tp)
+    mat = np.zeros(len(me.polygons), np.int64)
+    me.polygons.foreach_get("material_index", mat)
+    tl = tl.reshape(-1, 3)[mat[tp] == mat_index]
+    nl = len(me.loops)
+    uv = np.empty(nl * 2, np.float32)
+    me.uv_layers[uv_name].data.foreach_get("uv", uv)
+    lv = np.empty(nl, np.int64)
+    me.loops.foreach_get("vertex_index", lv)
+    co = np.empty(len(me.vertices) * 3, np.float64)
+    me.vertices.foreach_get("co", co)
+    cn = np.empty(nl * 3, np.float32)
+    me.corner_normals.foreach_get("vector", cn)
+    UV = uv.reshape(-1, 2)[tl].astype(np.float64)
+    P = co.reshape(-1, 3)[lv[tl]]
+    N = cn.reshape(-1, 3)[tl].astype(np.float64)
+    try:
+        me.calc_tangents(uvmap=uv_name)
+    except RuntimeError:
+        # n-gons: flat tangents per triangle are close enough for the check
+        T, S = triangle_tangents(P, UV, N)
+    else:
+        tan = np.empty(nl * 3, np.float32)
+        sgn = np.empty(nl, np.float32)
+        me.loops.foreach_get("tangent", tan)
+        me.loops.foreach_get("bitangent_sign", sgn)
+        me.free_tangents()
+        T = tan.reshape(-1, 3)[tl].astype(np.float64)
+        S = sgn[tl].astype(np.float64)
+    mw = np.array(o.matrix_world, dtype=np.float64)
+    A = mw[:3, :3]
+    if abs(np.linalg.det(A)) < 1e-12:
+        A = np.eye(3)
+    P = P @ A.T + mw[:3, 3]
+    N = N @ np.linalg.inv(A)     # normals move with the inverse transpose
+    T = T @ A.T
+    if np.linalg.det(A) < 0:
+        S = -S                   # a mirrored object swaps the handedness
+    return UV, P, N, T, S
+
+
+def check_normal_maps(objects, weld=1e-5):
+    """Check every tangent-space normal map of the objects' materials along the UV seams.
+    Returns [(image, result, uses)], result as core.normalmaps.check_green returns it,
+    or {"verdict": "MISSING"} for an image without pixels."""
+    from .core.normalmaps import check_green
+    results = []
+    for image, uses in normal_map_uses(objects).items():
+        try:
+            img = _image_pixels(image)
+        except ValueError:
+            results.append((image, {"verdict": "MISSING"}, uses))
+            continue
+        parts = [_tangent_triangles(o, uv, idx) for o, idx, uv in dict.fromkeys((o, i, uv) for o, i, uv, _ in uses)]
+        UV, P, N, T, S = (np.concatenate(a) for a in zip(*parts))
+        results.append((image, check_green(UV, P, N, T, S, img, weld), uses))
+    return results
+
+
+def flip_normal_map(image, uses, save=True):
+    """Put a copy of the normal map with its green channel inverted (<name>_green_up) in
+    place of it wherever it is read as a normal map.  Returns (new image, file path or None)."""
+    px = _image_pixels(image).copy()
+    px[..., 1] = 1.0 - px[..., 1]
+    new, path = _store_copy(image, px, "_green_up", save)
+    for *_, node in uses:
+        node.image = new
     return new, path
 
 

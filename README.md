@@ -47,6 +47,10 @@ The tab has three pages: **Mesh**, **Normals** and **UVs**.
 
 **[Smooth Normals](docs/guide.md#smooth-normals)** gives any meshes clean smooth normals. On layered game cloth, Blender's *Recalculate Outside* with *Set from Faces* leaves dark spots, seams and pinches where strings meet panels or faces are wound the other way. Smooth Normals never flips faces, so what you see from outside and from inside stays the same.
 
+### Normal Map Seams
+
+**[Normal Map Seams](docs/guide.md#normal-map-seams)** finds normal maps whose green channel points down (DirectX style), which is common in textures ported from other games. Blender and FFXIV expect it to point up, so these maps show hard lines along UV seams on glossy materials. **Check** tells you which maps are affected, and **Fix** puts flipped copies in their place. The game texture needs the same flip, and the guide explains how.
+
 ### UV tools
 
 The UVs page has four tools:

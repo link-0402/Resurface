@@ -216,6 +216,23 @@ class RESURFACE_PT_normals(_TabPanel, Panel):
         draw_report(layout, s, "report_normals")
 
 
+class RESURFACE_PT_normal_maps(_TabPanel, Panel):
+    bl_label = "Normal Map Seams"
+    bl_order = 2
+    tab = "NORMALS"
+
+    def draw(self, context):
+        layout = self.layout
+        s = prepare(layout, context)
+        layout.label(text="Lines along UV seams in Material Preview?")
+        row = layout.row(align=True)
+        row.scale_y = 1.3
+        row.operator("resurface.check_normal_maps", icon="VIEWZOOM", text="Check")
+        row.operator("resurface.fix_normal_maps", icon="CHECKMARK", text="Fix")
+        layout.label(text="Finds normal maps with green pointing down", icon="INFO")
+        draw_report(layout, s, "report_normalmap")
+
+
 # ==========================================================================================
 # UVs tab
 # ==========================================================================================
@@ -407,6 +424,7 @@ classes = (
     RESURFACE_PT_mesh_cleanup,
     RESURFACE_PT_mesh_output,
     RESURFACE_PT_normals,
+    RESURFACE_PT_normal_maps,
     RESURFACE_PT_uv_rebuild,
     RESURFACE_PT_uv_transfer,
     RESURFACE_PT_uv_canvas,

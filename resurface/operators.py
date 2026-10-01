@@ -1,10 +1,11 @@
 import traceback
 
 import bpy
-from bpy.props import StringProperty
+from bpy.props import BoolProperty, StringProperty
 from bpy.types import Operator
 
 from . import blender_io
+from .core.normalmaps import MIN_SAMPLES
 from .pipeline import RebuildJob
 
 
@@ -283,6 +284,132 @@ class RESURFACE_OT_smooth_normals(Operator):
         return {"FINISHED"}
 
 
+def short_image_name(image):
+    """Image name for reports; FFXIV material textures drop their '.mtrl [hash]' part."""
+    import re
+    return re.sub(r"\.mtrl \[[0-9a-fA-F]+\]", "", image.name)
+
+
+def format_normal_map(image, r):
+    """Report lines for one checked map: its name, then the verdict indented below."""
+    v = r["verdict"]
+    if v == "DOWN":
+        verdict = ["green points down (DirectX style)", f"seams fit {r['ratio']:.1f}x better flipped"]
+    elif v == "UP":
+        verdict = ["green points up, fine"]
+    elif v == "MISSING":
+        verdict = ["no pixels (is the file missing?)"]
+    elif v == "NO_SEAMS":
+        verdict = ["no UV seams to compare"]
+    elif r["samples"] < MIN_SAMPLES:
+        verdict = ["too few UV seams to tell"]
+    else:
+        verdict = ["can't tell, both ways fit alike"]
+    return [short_image_name(image)] + ["    " + line for line in verdict]
+
+
+class _NormalMapOperator:
+    @classmethod
+    def poll(cls, context):
+        if context.mode != "OBJECT":
+            cls.poll_message_set("Switch to Object Mode")
+            return False
+        if not selected_meshes(context):
+            cls.poll_message_set("Select one or more mesh objects")
+            return False
+        return True
+
+    def check(self, context):
+        """The check results, or None after reporting an error."""
+        try:
+            results = blender_io.check_normal_maps(selected_meshes(context), context.scene.resurface.merge_distance)
+        except Exception as e:  # noqa: BLE001
+            traceback.print_exc()
+            self.report({"ERROR"}, f"Normal map check failed: {e}")
+            return None
+        if not results:
+            show_report(self, context, "report_normalmap",
+                        "No normal maps found\nThe materials need an Image Texture node\n"
+                        "feeding a Normal Map node (Tangent Space)")
+            return None
+        return results
+
+
+class RESURFACE_OT_check_normal_maps(_NormalMapOperator, Operator):
+    bl_idname = "resurface.check_normal_maps"
+    bl_label = "Check Normal Maps"
+    bl_description = (
+        "Find out whether the normal maps in the selected meshes' materials have green pointing up "
+        "(Blender, FFXIV) or down (DirectX style, e.g. from Unreal games), by reading them both ways "
+        "along the UV seams. Green pointing the wrong way shows as lines along UV seams"
+    )
+    bl_options = {"REGISTER"}
+
+    def execute(self, context):
+        import time
+        t0 = time.time()
+        results = self.check(context)
+        if results is None:
+            return {"CANCELLED"}
+        n = len(results)
+        lines = [f"Checked {n} normal map{'s' if n != 1 else ''} in {time.time() - t0:.1f} s"]
+        for image, r, _ in results:
+            lines += format_normal_map(image, r)
+        down = sum(r["verdict"] == "DOWN" for _, r, _ in results)
+        if down:
+            lines.append(f"Fix flips green on {down} of them")
+        show_report(self, context, "report_normalmap", "\n".join(lines))
+        return {"FINISHED"}
+
+
+class RESURFACE_OT_fix_normal_maps(_NormalMapOperator, Operator):
+    bl_idname = "resurface.fix_normal_maps"
+    bl_label = "Fix Normal Maps"
+    bl_description = (
+        "Check the normal maps like Check does, and replace each one whose green points down with a copy "
+        "with green flipped ('<name>_green_up', saved next to the original file or packed into the .blend). "
+        "The original image is kept"
+    )
+    bl_options = {"REGISTER", "UNDO"}
+
+    include_unclear: BoolProperty(
+        name="Also Unclear Ones",
+        description="Also flip the maps the check can't judge (no or too few UV seams), "
+                    "e.g. when the other maps from the same source point down",
+        default=False,
+    )  # type: ignore
+
+    def execute(self, context):
+        results = self.check(context)
+        if results is None:
+            return {"CANCELLED"}
+        flip = {"DOWN", "UNCLEAR", "NO_SEAMS"} if self.include_unclear else {"DOWN"}
+        lines = []
+        fixed = unclear = 0
+        for image, r, uses in results:
+            if r["verdict"] not in flip:
+                lines += format_normal_map(image, r)
+                unclear += r["verdict"] in {"UNCLEAR", "NO_SEAMS"}
+                continue
+            try:
+                _, path = blender_io.flip_normal_map(image, uses)
+            except Exception as e:  # noqa: BLE001
+                traceback.print_exc()
+                lines += [short_image_name(image), f"    failed: {e}"]
+                continue
+            fixed += 1
+            lines += [short_image_name(image), f"    green flipped, copy {'saved as PNG' if path else 'packed'}"]
+        if fixed:
+            lines.insert(0, f"Fixed {fixed} normal map{'s' if fixed != 1 else ''}")
+            if unclear:
+                lines.append("To flip the unclear ones too: F9 > Also Unclear Ones")
+            lines.append("In game, the mod's normal textures need the same flip")
+        else:
+            lines.insert(0, "Nothing to fix")
+        show_report(self, context, "report_normalmap", "\n".join(lines))
+        return {"FINISHED"}
+
+
 class RESURFACE_OT_rebuild_uvs(Operator):
     bl_idname = "resurface.rebuild_uvs"
     bl_label = "Rebuild UVs"
@@ -386,6 +513,8 @@ classes = (
     RESURFACE_OT_restore,
     RESURFACE_OT_discard_original,
     RESURFACE_OT_smooth_normals,
+    RESURFACE_OT_check_normal_maps,
+    RESURFACE_OT_fix_normal_maps,
     RESURFACE_OT_rebuild_uvs,
     RESURFACE_OT_transfer_texture,
     RESURFACE_OT_clear_report,

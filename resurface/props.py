@@ -23,7 +23,7 @@ ROW_ITEMS = _row_items()
 
 TAB_ITEMS = [
     ("MESH", "Mesh", "Rebuild the mesh with clean, even triangles", "MOD_REMESH", 0),
-    ("NORMALS", "Normals", "Clean smooth normals", "NORMALS_VERTEX_FACE", 1),
+    ("NORMALS", "Normals", "Clean smooth normals, and normal maps that show UV seams", "NORMALS_VERTEX_FACE", 1),
     ("UV", "UVs", "UV layout, texture transfer, canvas resize and index maps", "UV", 2),
 ]
 
@@ -381,6 +381,7 @@ class ResurfaceSettings(PropertyGroup):
     # ---- results shown in each panel ------------------------------------------------------
     report_mesh: StringProperty(default="")  # type: ignore
     report_normals: StringProperty(default="")  # type: ignore
+    report_normalmap: StringProperty(default="")  # type: ignore
     report_uvs: StringProperty(default="")  # type: ignore
     report_texture: StringProperty(default="")  # type: ignore
     report_canvas: StringProperty(default="")  # type: ignore
